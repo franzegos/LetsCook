@@ -1,6 +1,7 @@
 import Head from "next/head";
 import MarketMakingTable from "../components/tables/marketMakingTable";
 import QuickLaunchBanner from "../components/quickLaunchBanner";
+import { Button } from "@/components/ui/button";
 
 const Home = () => {
     return (

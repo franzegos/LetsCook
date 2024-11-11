@@ -29,20 +29,7 @@ import { useCallback, useEffect, useState, useRef } from "react";
 import { PublicKey, Connection } from "@solana/web3.js";
 import { getAssociatedTokenAddress, TOKEN_PROGRAM_ID, Mint, getTransferFeeConfig } from "@solana/spl-token";
 
-import {
-    HStack,
-    VStack,
-    Text,
-    Box,
-    Tooltip,
-    Link,
-    Modal,
-    ModalBody,
-    ModalContent,
-    Input,
-    ModalOverlay,
-    useDisclosure,
-} from "@chakra-ui/react";
+import { HStack, VStack, Text, Box, Link, Modal, ModalBody, ModalContent, Input, ModalOverlay, useDisclosure } from "@chakra-ui/react";
 import useResponsive from "../../hooks/useResponsive";
 import Image from "next/image";
 import { MdOutlineContentCopy } from "react-icons/md";
@@ -51,7 +38,7 @@ import WoodenButton from "../../components/Buttons/woodenButton";
 import useAppRoot from "../../context/useAppRoot";
 import { ColorType, createChart, CrosshairMode, LineStyle, UTCTimestamp } from "lightweight-charts";
 import trimAddress from "../../utils/trimAddress";
-import { FaChartLine, FaInfo, FaPowerOff } from "react-icons/fa";
+import { FaChartLine, FaInfo, FaPowerOff, FaWallet } from "react-icons/fa";
 
 import MyRewardsTable from "../../components/tables/myRewards";
 import Links from "../../components/Buttons/links";
@@ -74,6 +61,14 @@ import Loader from "../../components/loader";
 import useAddTradeRewards from "../../hooks/cookAMM/useAddTradeRewards";
 import { toast } from "react-toastify";
 import { Button } from "@/components/ui/button";
+import { IoSwapVertical } from "react-icons/io5";
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
+import { ChevronDown, Info, Loader2 } from "lucide-react";
+import usePlaceMarketOrder from "@/hooks/jupiter/usePlaceMarketOrder";
+import useSwapRaydium from "@/hooks/raydium/useSwapRaydium";
+import useSwapRaydiumClassic from "@/hooks/raydium/useSwapRaydiumClassic";
+import { CalculateChunkedOutput } from "@/utils/calculateChunkedOutput";
+import { getBaseOutput, getQuoteOutput } from "@/utils/getBaseQuoteOutput";
 
 interface MarketData {
     time: UTCTimestamp;
@@ -142,25 +137,21 @@ function filterLaunchRewards(list: Map<string, MMLaunchData>, amm: AMMData) {
 
 const TradePage = () => {
     const wallet = useWallet();
+    const { handleConnectWallet } = UseWalletConnection();
     const { connection } = useConnection();
     const router = useRouter();
     const { xs, sm, lg } = useResponsive();
 
-    const { ammData, mmLaunchData, SOLPrice, mintData, listingData } = useAppRoot();
+    const { ammData, mmLaunchData, SOLPrice, mintData, listingData, userSOLBalance } = useAppRoot();
 
     const { pageName } = router.query;
 
-    const [leftPanel, setLeftPanel] = useState("Info");
+    const [panel, setPanel] = useState("Trade");
+    const [isAddLiquidity, setIsAddLiquidity] = useState(true);
 
     const [additionalPixels, setAdditionalPixels] = useState(0);
 
-    const [selectedTab, setSelectedTab] = useState("Rewards");
-
     const [mobilePageContent, setMobilePageContent] = useState("Chart");
-
-    const handleClick = (tab: string) => {
-        setSelectedTab(tab);
-    };
 
     const [market_data, setMarketData] = useState<MarketData[]>([]);
     const [daily_data, setDailyData] = useState<MarketData[]>([]);
@@ -180,6 +171,9 @@ const TradePage = () => {
 
     const [user_base_amount, setUserBaseAmount] = useState<number>(0);
     const [user_lp_amount, setUserLPAmount] = useState<number>(0);
+
+    const [tokenAmount, setTokenAmount] = useState<number>(0);
+    const [solAmount, setSOLAmount] = useState<number>(0);
 
     const [total_supply, setTotalSupply] = useState<number>(0);
 
@@ -654,49 +648,104 @@ const TradePage = () => {
                                     <HStack spacing={3} align="start" justify="start">
                                         <p className="text-lg text-white">{trimAddress(base_mint.mint.address.toString())}</p>
 
-                                        <Tooltip label="Copy Contract Address" hasArrow fontSize="large" offset={[0, 10]}>
-                                            <div
-                                                style={{ cursor: "pointer" }}
-                                                onClick={(e) => {
-                                                    e.preventDefault();
-                                                    navigator.clipboard.writeText(base_mint.mint.address.toString());
-                                                }}
-                                            >
-                                                <MdOutlineContentCopy color="white" size={25} />
-                                            </div>
-                                        </Tooltip>
+                                        {/* <Tooltip label="Copy Contract Address" hasArrow fontSize="large" offset={[0, 10]}> */}
+                                        <div
+                                            style={{ cursor: "pointer" }}
+                                            onClick={(e) => {
+                                                e.preventDefault();
+                                                navigator.clipboard.writeText(base_mint.mint.address.toString());
+                                            }}
+                                        >
+                                            <MdOutlineContentCopy color="white" size={25} />
+                                        </div>
+                                        {/* </Tooltip> */}
 
-                                        <Tooltip label="View in explorer" hasArrow fontSize="large" offset={[0, 10]}>
-                                            <Link
-                                                href={getSolscanLink(base_mint.mint.address, "Token")}
-                                                target="_blank"
-                                                onClick={(e) => e.stopPropagation()}
-                                            >
-                                                <Image src="/images/solscan.png" width={25} height={25} alt="Solscan icon" />
-                                            </Link>
-                                        </Tooltip>
+                                        {/* <Tooltip label="View in explorer" hasArrow fontSize="large" offset={[0, 10]}> */}
+                                        <Link
+                                            href={getSolscanLink(base_mint.mint.address, "Token")}
+                                            target="_blank"
+                                            onClick={(e) => e.stopPropagation()}
+                                        >
+                                            <Image src="/images/solscan.png" width={25} height={25} alt="Solscan icon" />
+                                        </Link>
+                                        {/* </Tooltip> */}
                                     </HStack>
                                 </VStack>
                             </HStack>
 
-                            {!sm && (
-                                <div className="w-full px-4 pb-4">
-                                    <Button
-                                        onClick={() => {
-                                            leftPanel === "Info"
-                                                ? setLeftPanel("Trade")
-                                                : leftPanel === "Trade"
-                                                  ? setLeftPanel("Info")
-                                                  : setLeftPanel("Info");
-                                        }}
-                                        className="w-full px-10 py-8 text-2xl transition-all hover:opacity-90"
-                                    >
-                                        {leftPanel === "Info" ? "Trade" : "Info"}
-                                    </Button>
-                                </div>
+                            <div className="flex w-full justify-center">
+                                {["Trade", "Liquidity", "Info"].map((name, i) => {
+                                    const isActive = panel === name;
+
+                                    return (
+                                        <Button
+                                            key={name}
+                                            className={`text-md px-6 ${isActive ? "" : "text-opacity-75"}`}
+                                            variant={isActive ? "default" : "ghost"}
+                                            onClick={() => {
+                                                setPanel(name);
+                                            }}
+                                        >
+                                            {name}
+                                        </Button>
+                                    );
+                                })}
+                            </div>
+
+                            {panel === "Trade" && (
+                                <BuyAndSell
+                                    amm={amm}
+                                    base_mint={base_mint}
+                                    base_balance={amm_base_amount}
+                                    quote_balance={amm_quote_amount}
+                                    amm_lp_balance={amm_lp_amount}
+                                    user_base_balance={user_base_amount}
+                                    user_lp_balance={user_lp_amount}
+                                />
                             )}
 
-                            {leftPanel === "Info" && (
+                            {panel === "Liquidity" ? (
+                                isAddLiquidity ? (
+                                    <div className="mt-4 w-full">
+                                        <AddLiquidityPanel
+                                            amm={amm}
+                                            base_mint={base_mint}
+                                            user_base_balance={user_base_amount}
+                                            user_quote_balance={userSOLBalance}
+                                            sol_amount={solAmount}
+                                            token_amount={tokenAmount}
+                                            connected={wallet.connected}
+                                            setSOLAmount={setSOLAmount}
+                                            setTokenAmount={setTokenAmount}
+                                            handleConnectWallet={handleConnectWallet}
+                                            amm_base_balance={amm_lp_amount}
+                                            amm_quote_balance={amm_quote_amount}
+                                            amm_lp_balance={amm_lp_amount}
+                                        />
+                                    </div>
+                                ) : (
+                                    <div className="mt-4 w-full">
+                                        <RemoveLiquidityPanel
+                                            amm={amm}
+                                            base_mint={base_mint}
+                                            user_base_balance={user_base_amount}
+                                            user_quote_balance={userSOLBalance}
+                                            user_lp_balance={user_lp_amount}
+                                            sol_amount={solAmount}
+                                            token_amount={tokenAmount}
+                                            connected={wallet.connected}
+                                            setSOLAmount={setSOLAmount}
+                                            setTokenAmount={setTokenAmount}
+                                            handleConnectWallet={handleConnectWallet}
+                                            amm_base_balance={amm_lp_amount}
+                                            amm_quote_balance={amm_quote_amount}
+                                            amm_lp_balance={amm_lp_amount}
+                                        />
+                                    </div>
+                                )
+                            ) : null}
+
+                            {panel === "Info" && (
                                 <InfoContent
                                     listing={listing}
                                     amm={amm}
@@ -707,18 +756,6 @@ const TradePage = () => {
                                     total_supply={total_supply}
                                     sol_price={SOLPrice}
                                     quote_amount={amm_quote_amount}
-                                />
-                            )}
-
-                            {leftPanel === "Trade" && (
-                                <BuyAndSell
-                                    amm={amm}
-                                    base_mint={base_mint}
-                                    base_balance={amm_base_amount}
-                                    quote_balance={amm_quote_amount}
-                                    amm_lp_balance={amm_lp_amount}
-                                    user_base_balance={user_base_amount}
-                                    user_lp_balance={user_lp_amount}
                                 />
                             )}
                         </VStack>
@@ -762,16 +799,9 @@ const TradePage = () => {
                                     }}
                                 />
                             </div>
-
-                            <MyRewardsTable amm={amm} />
-
-                            {!wallet.connected && (
-                                <HStack w="100%" align="center" justify="center" mt={25}>
-                                    <Text fontSize={lg ? "large" : "x-large"} m={0} color={"white"} style={{ opacity: 0.5 }}>
-                                        Connect your wallet to see your orders
-                                    </Text>
-                                </HStack>
-                            )}
+                            <div className="-mt-4 w-full">
+                                <MyRewardsTable amm={amm} />
+                            </div>
                         </VStack>
                     )}
                 </HStack>
@@ -805,7 +835,7 @@ const TradePage = () => {
                             w="120px"
                             onClick={() => {
                                 setMobilePageContent("Trade");
-                                setLeftPanel("Trade");
+                                setPanel("Trade");
                             }}
                         >
                             <IoMdSwap size={28} color={"#683309"} />
@@ -818,7 +848,7 @@ const TradePage = () => {
                             w="120px"
                             onClick={() => {
                                 setMobilePageContent("Info");
-                                setLeftPanel("Info");
+                                setPanel("Info");
                             }}
                         >
                             <FaInfo size={24} color={"#683309"} />
@@ -910,6 +940,16 @@ const AddRewardModal = ({ amm, isOpen, onClose }: { amm: AMMData; isOpen: boolea
     );
 };
 
+interface BuyAndSellProps {
+    amm: AMMData;
+    base_mint: MintData;
+    base_balance: number;
+    quote_balance: number;
+    amm_lp_balance: number;
+    user_base_balance: number;
+    user_lp_balance: number;
+}
+
 const BuyAndSell = ({
     amm,
     base_mint,
@@ -918,178 +958,278 @@ const BuyAndSell = ({
     amm_lp_balance,
     user_base_balance,
     user_lp_balance,
-}: {
-    amm: AMMData;
-    base_mint: MintData;
-    base_balance: number;
-    quote_balance: number;
-    amm_lp_balance: number;
-    user_base_balance: number;
-    user_lp_balance: number;
-}) => {
-    const { xs } = useResponsive();
+}: BuyAndSellProps) => {
+    const [isBuy, setIsBuy] = useState(true);
+    const [tokenAmount, setTokenAmount] = useState<number>(0);
+    const [solAmount, setSOLAmount] = useState<number>(0);
+    const [isTxnDetailOpen, setIsTxnDetailOpen] = useState(false);
+
     const wallet = useWallet();
     const { handleConnectWallet } = UseWalletConnection();
-    const [selected, setSelected] = useState("Buy");
-    const [token_amount, setTokenAmount] = useState<number>(0);
-    const [sol_amount, setSOLAmount] = useState<number>(0);
-
     const { userSOLBalance } = useAppRoot();
+    const { PlaceMarketOrder, isLoading: placingOrder } = usePlaceMarketOrder(amm);
+    const { SwapRaydium, isLoading: placingRaydiumOrder } = useSwapRaydium(amm);
+    const { SwapRaydiumClassic, isLoading: placingRaydiumClassicOrder } = useSwapRaydiumClassic(amm);
 
-    const handleClick = (tab: string) => {
-        setSelected(tab);
-    };
+    const isLoading = placingOrder || placingRaydiumOrder || placingRaydiumClassicOrder;
 
-    //console.log(base_balance/Math.pow(10, 6), quote_balance)
-
-    let transfer_fee = 0;
-    let max_transfer_fee = 0;
-    let transfer_fee_config = getTransferFeeConfig(base_mint.mint);
-    if (transfer_fee_config !== null) {
-        transfer_fee = transfer_fee_config.newerTransferFee.transferFeeBasisPoints;
-        max_transfer_fee = Number(transfer_fee_config.newerTransferFee.maximumFee) / Math.pow(10, base_mint.mint.decimals);
+    // Early return if required props are missing
+    if (!base_mint || !amm) {
+        return null;
     }
 
+    const baseDecimals = base_mint.mint.decimals;
+    const baseRaw = Math.floor(tokenAmount * Math.pow(10, baseDecimals));
+    const quoteRaw = Math.floor(solAmount * Math.pow(10, 9));
+
+    const plugins: AMMPluginData = getAMMPlugins(amm);
+
+    const calculateOutputs = () => {
+        const base_output = plugins.liquidity_active
+            ? CalculateChunkedOutput(quoteRaw, quote_balance, base_balance, amm.fee, plugins, baseDecimals)
+            : getBaseOutput(quoteRaw, base_balance, quote_balance, amm.fee, baseDecimals);
+
+        const quote_output = plugins.liquidity_active
+            ? CalculateChunkedOutput(baseRaw, quote_balance, base_balance, amm.fee, plugins, 9, baseDecimals)
+            : getQuoteOutput(baseRaw, base_balance, quote_balance, amm.fee, 9, baseDecimals);
+
+        const base_rate = plugins.liquidity_active
+            ? CalculateChunkedOutput(1e9, quote_balance, base_balance, 0, plugins, baseDecimals)
+            : getBaseOutput(1e9, base_balance, quote_balance, 0, baseDecimals);
+
+        const quote_rate = plugins.liquidity_active
+            ? CalculateChunkedOutput(1 * Math.pow(10, baseDecimals), quote_balance, base_balance, 0, plugins, 9, baseDecimals)
+            : getQuoteOutput(1 * Math.pow(10, baseDecimals), base_balance, quote_balance, 0, 9, baseDecimals);
+
+        return { base_output, quote_output, base_rate, quote_rate };
+    };
+
+    const { base_output, quote_output, base_rate, quote_rate } = calculateOutputs();
+
+    const formatOutputString = (output: number[], decimals: number) => {
+        const outputString = formatPrice(output[0], decimals);
+        const slippage = output[1] / output[0] - 1;
+        const slippageString = isNaN(slippage) ? "0" : (slippage * 100).toFixed(2);
+        return {
+            outputString: outputString === "NaN" ? "0" : outputString,
+            slippageString,
+            fullString: slippage > 0 ? `${outputString} (${slippageString}%)` : outputString,
+        };
+    };
+
+    const base_output_formatted = formatOutputString(base_output, baseDecimals);
+    const quote_output_formatted = formatOutputString(quote_output, 5);
+
+    const handleAmountChange = (value: string) => {
+        const parsedValue = parseFloat(value);
+        const isValidNumber = !isNaN(parsedValue) || value === "";
+        const newValue = isValidNumber ? parsedValue : 0;
+
+        setSOLAmount(newValue);
+        setTokenAmount(newValue);
+    };
+
+    const handleSwap = async () => {
+        if (!wallet.connected) {
+            handleConnectWallet();
+            return;
+        }
+
+        const solAmount_raw = solAmount * Math.pow(10, 9);
+        const tokenAmount_raw = tokenAmount * Math.pow(10, baseDecimals);
+
+        try {
+            if (isBuy) {
+                switch (amm.provider) {
+                    case 0:
+                        await PlaceMarketOrder(tokenAmount, solAmount, 0);
+                        break;
+                    case 1:
+                        await SwapRaydium(base_output[0] * Math.pow(10, baseDecimals), 2 * solAmount_raw, 0);
+                        break;
+                    case 2:
+                        await SwapRaydiumClassic(base_output[0] * Math.pow(10, baseDecimals), solAmount_raw, 0);
+                        break;
+                }
+            } else {
+                switch (amm.provider) {
+                    case 0:
+                        await PlaceMarketOrder(tokenAmount, solAmount, 1);
+                        break;
+                    case 1:
+                        await SwapRaydium(tokenAmount_raw, 0, 1);
+                        break;
+                    case 2:
+                        await SwapRaydiumClassic(tokenAmount_raw, 0, 1);
+                        break;
+                }
+            }
+        } catch (error) {
+            console.error("Swap failed:", error);
+        }
+    };
+
+    const transfer_fee_config = getTransferFeeConfig(base_mint.mint);
+    const transfer_fee = transfer_fee_config?.newerTransferFee.transferFeeBasisPoints ?? 0;
+    const max_transfer_fee = transfer_fee_config ? Number(transfer_fee_config.newerTransferFee.maximumFee) / Math.pow(10, baseDecimals) : 0;
+
+    const AMMfee = (amm.fee * 0.001).toFixed(3);
+
     return (
-        <VStack align="start" w="100%" gap={0}>
-            <HStack align="center" spacing={0} zIndex={99} w="100%" className="px-4">
-                {["Buy", "Sell", "LP+", "LP-"].map((name, i) => {
-                    const isActive = selected === name;
+        <div className="my-4 w-full px-4 text-white">
+            <div className="flex flex-col">
+                {/* Input Fields */}
+                <div>
+                    {/* From Token Input */}
+                    <div>
+                        <div className="mb-2 flex items-center justify-between opacity-50">
+                            <div>You're Paying</div>
+                            <div className="flex items-center gap-1">
+                                <FaWallet size={12} />
+                                <p className="text-sm">
+                                    {isBuy
+                                        ? userSOLBalance.toFixed(5)
+                                        : (user_base_balance / Math.pow(10, baseDecimals)).toLocaleString("en-US", {
+                                              minimumFractionDigits: 2,
+                                          })}
+                                </p>
+                            </div>
+                        </div>
+                        <div className="flex items-center gap-2 rounded-xl bg-gray-800 p-3">
+                            <div className="flex items-center gap-2 rounded-lg bg-gray-700 px-2.5 py-1.5">
+                                <div className="w-6">
+                                    <Image
+                                        src={isBuy ? Config.token_image : base_mint.icon}
+                                        width={25}
+                                        height={25}
+                                        alt="Token Icon"
+                                        className="rounded-full"
+                                    />
+                                </div>
+                                <span className="text-nowrap">{isBuy ? Config.token : base_mint.name}</span>
+                            </div>
+                            <input
+                                type="number"
+                                min="0"
+                                placeholder="0"
+                                className="w-full bg-transparent text-right focus:outline-none"
+                                value={isBuy ? solAmount : tokenAmount}
+                                onChange={(e) => handleAmountChange(e.target.value)}
+                            />
+                        </div>
+                    </div>
 
-                    const baseStyle = {
-                        display: "flex",
-                        alignItems: "center",
-                        cursor: "pointer",
-                    };
-
-                    const activeStyle = {
-                        background: isActive ? "#edf2f7" : "transparent",
-                        color: isActive ? "black" : "white",
-                        borderRadius: isActive ? "6px" : "",
-                        border: isActive ? "none" : "",
-                    };
-
-                    return (
-                        <Box
-                            key={i}
-                            style={{
-                                ...baseStyle,
-                                ...activeStyle,
-                            }}
-                            onClick={() => {
-                                handleClick(name);
-                            }}
-                            px={4}
-                            py={2}
-                            w={"50%"}
+                    {/* Swap Button */}
+                    <div className="flex justify-center">
+                        <button
+                            onClick={() => setIsBuy(!isBuy)}
+                            className="z-50 mx-auto -mb-4 mt-2 cursor-pointer rounded-lg bg-gray-800 p-2 hover:bg-gray-700"
                         >
-                            <Text m={"0 auto"} fontSize="large" fontWeight="semibold">
-                                {name}
-                            </Text>
-                        </Box>
-                    );
-                })}
-            </HStack>
-            <div className="mt-1 flex w-full justify-between px-4 py-3">
-                <span className="text-md text-white text-opacity-50">Available Balance:</span>
-                <span className="text-md text-white/50">
-                    {selected === "Buy"
-                        ? userSOLBalance.toFixed(5)
-                        : selected === "LP-"
-                          ? user_lp_balance / Math.pow(10, 9) < 1e-3
-                              ? (user_lp_balance / Math.pow(10, 9)).toExponential(3)
-                              : (user_lp_balance / Math.pow(10, 9)).toFixed(Math.min(3))
-                          : (user_base_balance / Math.pow(10, base_mint.mint.decimals)).toLocaleString("en-US", {
-                                minimumFractionDigits: 2,
-                            })}{" "}
-                    {selected === "Buy" ? Config.token : selected === "LP-" ? "LP" : base_mint.symbol}
-                </span>
+                            <IoSwapVertical size={18} className="opacity-75" />
+                        </button>
+                    </div>
+
+                    {/* To Token Input */}
+                    <div className="">
+                        <div className="mb-2 flex items-center justify-between opacity-50">
+                            <div>To Receive</div>
+                            <div className="flex items-center gap-1">
+                                <FaWallet size={12} />
+                                <p className="text-sm">
+                                    {!isBuy
+                                        ? userSOLBalance.toFixed(5)
+                                        : (user_base_balance / Math.pow(10, baseDecimals)).toLocaleString("en-US", {
+                                              minimumFractionDigits: 2,
+                                          })}
+                                </p>
+                            </div>
+                        </div>
+                        <div className="flex items-center gap-2 rounded-xl bg-gray-800 p-3">
+                            <div className="flex items-center gap-2 rounded-lg bg-gray-700 px-2.5 py-1.5">
+                                <div className="w-6">
+                                    <Image
+                                        src={!isBuy ? Config.token_image : base_mint.icon}
+                                        width={25}
+                                        height={25}
+                                        alt="Token Icon"
+                                        className="rounded-full"
+                                    />
+                                </div>
+                                <span className="text-nowrap">{!isBuy ? Config.token : base_mint.name}</span>
+                            </div>
+                            <input
+                                readOnly
+                                disabled
+                                type="text"
+                                className="w-full cursor-not-allowed bg-transparent text-right opacity-50 focus:outline-none"
+                                value={isBuy ? base_output_formatted.fullString : quote_output_formatted.fullString}
+                            />
+                        </div>
+                    </div>
+                </div>
+
+                {/* Transaction Details */}
+                <div className="my-2 flex w-full max-w-md flex-col rounded-lg bg-white/5">
+                    <button
+                        onClick={() => setIsTxnDetailOpen(!isTxnDetailOpen)}
+                        className="flex w-full items-center justify-between rounded-md px-3 py-[0.6rem] text-white transition-colors hover:bg-white/10"
+                    >
+                        <span>Transaction Details</span>
+                        <ChevronDown className={`h-4 w-4 transition-transform duration-200 ${isTxnDetailOpen ? "rotate-180" : ""}`} />
+                    </button>
+
+                    {isTxnDetailOpen && (
+                        <div className="flex flex-col gap-3 rounded-md px-3 py-3 text-white text-opacity-50">
+                            <HStack w="100%" justify="space-between">
+                                <p className="text-md">Rate</p>
+                                <p className="text-right">
+                                    {isBuy
+                                        ? `1 ${Config.token} = ${formatPrice(base_rate[0], baseDecimals)} ${base_mint.symbol}`
+                                        : `1 ${base_mint.symbol} = ${formatPrice(quote_rate[0], 5)} ${Config.token}`}
+                                </p>
+                            </HStack>
+
+                            <HStack w="100%" justify="space-between">
+                                <p className="text-md">Liquidity Provider Fee</p>
+                                <p>{AMMfee}%</p>
+                            </HStack>
+
+                            <HStack w="100%" justify="space-between">
+                                <p className="text-md">Slippage</p>
+                                <p>{isBuy ? base_output_formatted.slippageString : quote_output_formatted.slippageString}%</p>
+                            </HStack>
+
+                            {max_transfer_fee > 0 && (
+                                <>
+                                    <div className="h-1 w-full border-b border-gray-600/50"></div>
+                                    <HStack w="100%" justify="space-between">
+                                        <p className="text-md">Transfer Fee</p>
+                                        <p>{transfer_fee / 100}%</p>
+                                    </HStack>
+                                    <HStack w="100%" justify="space-between">
+                                        <p className="text-md">Max Transfer Fee</p>
+                                        <p>
+                                            {max_transfer_fee} {base_mint.symbol}
+                                        </p>
+                                    </HStack>
+                                </>
+                            )}
+                        </div>
+                    )}
+                </div>
+
+                {/* Swap Button */}
+                <button
+                    className={`w-full rounded-xl py-3 text-lg font-semibold text-black hover:bg-opacity-90 ${
+                        !wallet.connected ? "bg-white" : isBuy ? "bg-[#83FF81]" : "bg-[#FF6E6E]"
+                    }`}
+                    onClick={handleSwap}
+                    disabled={isLoading}
+                >
+                    {!wallet.connected ? "Connect Wallet" : isLoading ? <Loader2 className="mx-auto animate-spin" /> : "Swap"}
+                </button>
             </div>
-            {/* 
-
-            <div className="flex w-full justify-between border-b border-gray-600/50 px-4 py-3">
-                <span className="text-md text- text-white text-opacity-50">AMM LP Fee:</span>
-                <span className="text-md text-white">{(amm.fee * 0.01).toFixed(2)}%</span>
-            </div>
-
-            <div className="flex w-full justify-between border-b border-gray-600/50 px-4 py-3">
-                <span className="text-md text- text-white text-opacity-50">Transfer Fee (bps):</span>
-                <span className="text-md text-white">{transfer_fee}</span>
-            </div>
-
-            <div className="flex w-full justify-between border-b border-gray-600/50 px-4 py-3">
-                <span className="text-md text- text-white text-opacity-50">Max Transfer Fee ({base_mint.symbol}):</span>
-                <span className="text-md text-white">{max_transfer_fee}</span>
-            </div> */}
-
-            {selected === "Buy" && (
-                <BuyPanel
-                    amm={amm}
-                    base_mint={base_mint}
-                    user_base_balance={user_base_balance}
-                    user_quote_balance={userSOLBalance}
-                    sol_amount={sol_amount}
-                    token_amount={token_amount}
-                    connected={wallet.connected}
-                    setSOLAmount={setSOLAmount}
-                    setTokenAmount={setTokenAmount}
-                    handleConnectWallet={handleConnectWallet}
-                    amm_base_balance={base_balance}
-                    amm_quote_balance={quote_balance}
-                />
-            )}
-            {selected === "Sell" && (
-                <SellPanel
-                    amm={amm}
-                    base_mint={base_mint}
-                    user_base_balance={user_base_balance}
-                    user_quote_balance={userSOLBalance}
-                    sol_amount={sol_amount}
-                    token_amount={token_amount}
-                    connected={wallet.connected}
-                    setSOLAmount={setSOLAmount}
-                    setTokenAmount={setTokenAmount}
-                    handleConnectWallet={handleConnectWallet}
-                    amm_base_balance={base_balance}
-                    amm_quote_balance={quote_balance}
-                />
-            )}
-            {selected === "LP+" && (
-                <AddLiquidityPanel
-                    amm={amm}
-                    base_mint={base_mint}
-                    user_base_balance={user_base_balance}
-                    user_quote_balance={userSOLBalance}
-                    sol_amount={sol_amount}
-                    token_amount={token_amount}
-                    connected={wallet.connected}
-                    setSOLAmount={setSOLAmount}
-                    setTokenAmount={setTokenAmount}
-                    handleConnectWallet={handleConnectWallet}
-                    amm_base_balance={base_balance}
-                    amm_quote_balance={quote_balance}
-                    amm_lp_balance={amm_lp_balance}
-                />
-            )}
-            {selected === "LP-" && (
-                <RemoveLiquidityPanel
-                    amm={amm}
-                    base_mint={base_mint}
-                    user_base_balance={user_base_balance}
-                    user_quote_balance={userSOLBalance}
-                    user_lp_balance={user_lp_balance}
-                    sol_amount={sol_amount}
-                    token_amount={token_amount}
-                    connected={wallet.connected}
-                    setSOLAmount={setSOLAmount}
-                    setTokenAmount={setTokenAmount}
-                    handleConnectWallet={handleConnectWallet}
-                    amm_base_balance={base_balance}
-                    amm_quote_balance={quote_balance}
-                    amm_lp_balance={amm_lp_balance}
-                />
-            )}
-        </VStack>
+        </div>
     );
 };
 
@@ -1143,7 +1283,7 @@ const InfoContent = ({
 
     return (
         <>
-            <div className="-mt-2 flex w-full flex-col space-y-0">
+            <div className="mt-2 flex w-full flex-col space-y-0">
                 <div className="flex w-full justify-between border-b border-gray-600/50 px-4 py-3">
                     <span className="text-md text- text-white text-opacity-50">Pool:</span>
                     <div className="flex items-center space-x-2">
@@ -1218,12 +1358,6 @@ const InfoContent = ({
                     />
                 </div>
 
-                {/* Socials */}
-                <div className="flex w-full justify-between px-4 py-3">
-                    <span className="text-md text- text-white text-opacity-50">Socials:</span>
-                    <Links socials={listing.socials} isTradePage={true} />
-                </div>
-
                 {/* Extensions */}
                 {base_mint.extensions !== 0 && (
                     <div className="flex w-full justify-between border-b border-gray-600/50 px-4 py-3">
@@ -1231,6 +1365,12 @@ const InfoContent = ({
                         <ShowExtensions extension_flag={base_mint.extensions} />
                     </div>
                 )}
+
+                {/* Socials */}
+                <div className="flex w-full justify-between px-4 py-3">
+                    <span className="text-md text- text-white text-opacity-50">Socials:</span>
+                    <Links socials={listing.socials} isTradePage={true} />
+                </div>
             </div>
             <AddRewardModal amm={amm} isOpen={isRewardsOpen} onClose={onRewardsClose} />
         </>

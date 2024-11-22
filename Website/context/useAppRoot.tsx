@@ -21,7 +21,6 @@ interface AppRootTypes {
     mmUserData: Map<string, MMUserData>;
     ammData: Map<string, AMMData>;
     userSOLBalance: number;
-    SOLPrice: number;
     mintData: Map<String, MintData>;
     newCollectionData: MutableRefObject<CollectionDataUserInput>;
     collectionList: Map<string, CollectionData>;
@@ -52,7 +51,6 @@ export const AppRootContextProvider = ({
     mmUserData,
     ammData,
     userSOLBalance,
-    SOLPrice,
     mintData,
     newCollectionData,
     collectionList,
@@ -81,7 +79,6 @@ export const AppRootContextProvider = ({
                 mmUserData,
                 ammData,
                 userSOLBalance,
-                SOLPrice,
                 mintData,
                 newCollectionData,
                 collectionList,

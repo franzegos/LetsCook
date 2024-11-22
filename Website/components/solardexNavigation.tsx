@@ -40,20 +40,16 @@ function Navigation() {
                 </div>
 
                 <HStack gap={3}>
-                    <Show breakpoint="(min-width: 1024px)">
-                        <HStack>
-                            <Link href="https://x.com/solar_dex" target="_blank">
-                                <BsTwitter size={28} color="white" />
-                            </Link>
-                        </HStack>
-                    </Show>
+                    <HStack>
+                        <Link href="https://x.com/solar_dex" target="_blank">
+                            <BsTwitter size={28} color="white" />
+                        </Link>
+                    </HStack>
 
-                    <Show breakpoint="(min-width: 1024px)">
-                        <>
-                            {wallet.publicKey && <DisconnectWalletButton />}
-                            {wallet.publicKey === null && <ConnectWalletButton />}
-                        </>
-                    </Show>
+                    <>
+                        {wallet.publicKey && <DisconnectWalletButton />}
+                        {wallet.publicKey === null && <ConnectWalletButton />}
+                    </>
                 </HStack>
             </HStack>
         </>

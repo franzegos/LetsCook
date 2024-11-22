@@ -135,7 +135,15 @@ const AppRootPage = ({ children }: PropsWithChildren) => {
                                 <h1 className="text-4xl font-bold">Solar Dex Badge NFT</h1>
                             </div>
                             <p className="text-gray-300">
-                                Secure your position in the Solar Dex ecosystem by minting the exclusive Genesis Badge NFT.
+                                Secure your position in the{" "}
+                                <Link
+                                    className="font-bold text-white underline"
+                                    href={"https://eclipse.solarstudios.co/swap/"}
+                                    target="_blank"
+                                >
+                                    Solar Dex
+                                </Link>{" "}
+                                ecosystem by minting the exclusive Genesis Badge NFT.
                             </p>
                         </div>
 

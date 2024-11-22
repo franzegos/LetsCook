@@ -58,11 +58,13 @@ function nFormatter(num: number, digits: number) {
 
 const MarketMakingTable = () => {
     const wallet = useWallet();
-    const { ammData, SOLPrice, mintData, listingData, jupPrices } = useAppRoot();
+    const { ammData, mintData, listingData, jupPrices } = useAppRoot();
     const [sortedField, setSortedField] = useState<string>("liquidity");
     const [reverseSort, setReverseSort] = useState<boolean>(true);
     const [rows, setRows] = useState<AMMLaunch[]>([]);
     const [searchTerm, setSearchTerm] = useState("");
+
+    const SOLPrice = 0;
 
     const tableHeaders = [
         { text: "Token", field: "symbol" },

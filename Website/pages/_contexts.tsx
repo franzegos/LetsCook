@@ -458,7 +458,6 @@ const ContextProviders = ({ children }: PropsWithChildren) => {
             tokenData.set(token.mint.address.toString(), token);
         }
 
-        console.log("Setting initial data from DB");
         setAMMData(ammData);
         setListingData(listingData);
         setMintData(tokenData);

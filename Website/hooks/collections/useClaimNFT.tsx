@@ -36,6 +36,7 @@ import { publicKey } from "@metaplex-foundation/beet-solana";
 import useMintRandom from "./useMintRandom";
 import useWrapSOL from "../useWrapSOL";
 import { wrap } from "module";
+import { getTradeMintData } from "@/utils/getTokenMintData";
 
 class OraoTokenFeeConfig {
     constructor(
@@ -271,7 +272,15 @@ const useClaimNFT = (launchData: CollectionData, wrapToken: boolean = false) => 
         let program_sol_account = PublicKey.findProgramAddressSync([uInt32ToLEBytes(SOL_ACCOUNT_SEED)], PROGRAM)[0];
 
         let token_mint = launchData.keys[CollectionKeys.MintAddress];
-        let mint_info = mintData.get(launchData.keys[CollectionKeys.MintAddress].toString());
+
+        const mainToken = "So11111111111111111111111111111111111111112";
+
+        const mainTokenMintData = await getTradeMintData([mainToken]);
+
+        const WETH = mainTokenMintData.get(mainToken);
+
+        let mint_info = WETH;
+
         let mint_account = mint_info.mint;
 
         let user_token_account_key = await getAssociatedTokenAddress(

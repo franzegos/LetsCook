@@ -18,7 +18,7 @@ import ReceivedAssetModal from "@/components/genericReceiveAssetModal";
 
 const AppRootPage = ({ children }: PropsWithChildren) => {
     const wallet = useWallet();
-    const pageName = "solar-badge";
+    const pageName = "solardex";
 
     const { isOpen: isAssetModalOpen, onOpen: openAssetModal, onClose: closeAssetModal } = useDisclosure();
 

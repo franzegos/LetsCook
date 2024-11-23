@@ -202,6 +202,7 @@ const useMintRandom = (launchData: CollectionData, updateData: boolean = false) 
             { pubkey: program_sol_account, isSigner: false, isWritable: true },
 
             { pubkey: nft_mint_account, isSigner: true, isWritable: true },
+            { pubkey: launchData.keys[CollectionKeys.CollectionMint], isSigner: false, isWritable: true },
             { pubkey: launchData.keys[CollectionKeys.TeamWallet], isSigner: false, isWritable: true },
             { pubkey: token_mint, isSigner: false, isWritable: false },
             { pubkey: pda_token_account_key, isSigner: false, isWritable: true },

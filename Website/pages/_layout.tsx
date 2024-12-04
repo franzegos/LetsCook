@@ -15,10 +15,13 @@ import PageNotFound from "@/components/pageNotFound";
 import Navigation from "@/components/solardexNavigation";
 import useCollectionSnapshot from "@/hooks/useGetCollectionObject";
 import ReceivedAssetModal from "@/components/genericReceiveAssetModal";
+import useGetUserBalance from "@/hooks/useGetUserBalance";
 
 const AppRootPage = ({ children }: PropsWithChildren) => {
     const wallet = useWallet();
     const pageName = "solardex";
+
+    const { userBalance: userSOLBalance } = useGetUserBalance();
 
     const { isOpen: isAssetModalOpen, onOpen: openAssetModal, onClose: closeAssetModal } = useDisclosure();
 
@@ -70,6 +73,8 @@ const AppRootPage = ({ children }: PropsWithChildren) => {
 
     if (!collection) return <PageNotFound />;
 
+    const enoughTokenBalance = userSOLBalance > 0.000325;
+
     const Mint = () => {
         return (
             <div className="w-full">
@@ -80,10 +85,14 @@ const AppRootPage = ({ children }: PropsWithChildren) => {
                         onClick={() => {
                             ClaimNFT();
                         }}
-                        isDisabled={isLoading || !wallet.connected}
+                        isDisabled={isLoading || !wallet.connected || !enoughTokenBalance}
                         isLoading={isLoading}
                     >
-                        {!wallet.connected ? "Connect Your Wallet" : "Mint Badge (0.0003 ETH)"}
+                        {!wallet.connected
+                            ? "Connect Your Wallet"
+                            : !enoughTokenBalance
+                              ? "Insufficient Balance"
+                              : "Mint Badge (0.0003 ETH)"}
                     </Button>
                 ) : (
                     <Button

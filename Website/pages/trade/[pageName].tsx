@@ -680,7 +680,7 @@ const TradePage = () => {
                                     return (
                                         <Button
                                             key={name}
-                                            className={`text-md px-6 ${isActive ? "" : "text-opacity-75"}`}
+                                            className={`text-md px-6 text-white ${isActive ? "" : "text-opacity-75"} hover:text-black`}
                                             variant={isActive ? "default" : "ghost"}
                                             onClick={() => {
                                                 setPanel(name);
@@ -1077,7 +1077,7 @@ const BuyAndSell = ({
 
     return (
         <div className="my-4 w-full px-4 text-white">
-            <div className="flex flex-col">
+            <div className="flex flex-col gap-2">
                 {/* Input Fields */}
                 <div>
                     {/* From Token Input */}
